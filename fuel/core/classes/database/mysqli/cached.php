@@ -25,30 +25,42 @@ class Database_MySQLi_Cached extends \Database_Result implements \SeekableIterat
 		// go the generic construction processing
 		parent::__construct($result, $sql, $as_object);
 
-		// Convert the result into an array, as PDOStatement::rowCount is not reliable
-		if ($this->_as_object === false)
+		// if an array is passed, use it
+		if (is_array($result))
 		{
-			$this->_result = $this->result->fetch_all(MYSQLI_ASSOC);
+			$this->_results = $result;
 		}
-		elseif (is_string($this->_as_object))
+
+		// else we're getting a mysqli object. convert the result into an array
+		elseif ($result instanceof \MySQLi_Result)
 		{
-			$this->_result = array();
-			while ($row = $this->result->fetch_object($this->_as_object))
+			if ($this->_as_object === false)
 			{
-				$this->_result[] = $row;
+				$this->_results = $this->_result->fetch_all(MYSQLI_ASSOC);
+			}
+			elseif (is_string($this->_as_object))
+			{
+				$this->_results = array();
+				while ($row = $this->_result->fetch_object($this->_as_object))
+				{
+					$this->_results[] = $row;
+				}
+			}
+			else
+			{
+				$this->_results = array();
+				while ($row = $this->_result->fetch_object())
+				{
+					$this->_results[] = $row;
+				}
 			}
 		}
 		else
 		{
-			$this->_result = array();
-			while ($row = $this->result->fetch_object())
-			{
-				$this->_result[] = $row;
-			}
+			throw new \FuelException('Database_Cached requires database results in either an array or a database object');
 		}
 
-		// Find the number of rows in the result
-		$this->_total_rows = $this->result->num_rows;
+		$this->_total_rows = count($this->_results);
 	}
 
 	/**
@@ -103,16 +115,32 @@ class Database_MySQLi_Cached extends \Database_Result implements \SeekableIterat
 	{
 		if ($this->valid())
 		{
-			$result = $this->_result[$this->_current_row];
+			$this->_row = $this->_results[$this->_current_row];
 
 			// sanitize the data if needed
 			if ($this->_sanitization_enabled)
 			{
-				$result = \Security::clean($result, null, 'security.output_filter');
+				$this->_row = \Security::clean($this->_row, null, 'security.output_filter');
 			}
-
-			return $result;
 		}
+		else
+		{
+			$this->rewind();
+		}
+
+		return $this->_row;
+	}
+
+	/**
+	 * Implements [Iterator::next], returns the next row.
+	 *
+	 * @return  mixed
+	 */
+	public function next()
+	{
+		parent::next();
+
+		isset($this->_results[$this->_current_row]) and $this->_row = $this->_results[$this->_current_row];
 	}
 
 	/**************************
@@ -133,7 +161,7 @@ class Database_MySQLi_Cached extends \Database_Result implements \SeekableIterat
 	 */
 	public function offsetExists($offset)
 	{
-		return isset($this->_result[$offset]);
+		return isset($this->_results[$offset]);
 	}
 
 	/**
@@ -153,7 +181,7 @@ class Database_MySQLi_Cached extends \Database_Result implements \SeekableIterat
 		}
 		else
 
-		$result = $this->_result[$offset];
+		$result = $this->_results[$offset];
 
 		// sanitize the data if needed
 		if ($this->_sanitization_enabled)

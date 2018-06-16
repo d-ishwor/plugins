@@ -3,3 +3,4 @@
 # dynamically generated files
 /fuel/app/logs/*/*/*
 /fuel/app/cache/*/*
+docs/
