@@ -63,4 +63,9 @@ class Controller_Welcome extends Controller
 		$element = (!$ele) ? $ele : 'modal';
 		return view::forge('elements/'.$ele);
 	}
+
+
+	public function action_cropper(){
+		return view::forge('demo/cropper');
+	}
 }
